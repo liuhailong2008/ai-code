@@ -4,28 +4,24 @@
     <div class="page-header">
       <div>
         <div class="page-title">整体网络监控</div>
-        <div class="page-subtitle">实时监控跨机房网络质量</div>
+        <div class="page-subtitle">实时监控跨机房网络质量 · 最后更新: {{ lastUpdate }}</div>
       </div>
-      <div class="page-actions-right">
+      <div class="page-actions">
         <select v-model="currentGlobalMetric" class="metric-select" @change="switchGlobalMetric(currentGlobalMetric)">
           <option v-for="m in allMetrics" :key="m.id" :value="m.id">{{ m.label }}</option>
         </select>
-        <div class="time-control">
-          <select v-model="selectedMinute" class="time-select" @change="updateAll">
-            <option v-for="(t, idx) in timeOptions" :key="idx" :value="idx">{{ t }}</option>
-          </select>
-        </div>
-        <div class="update-frequency">
-          <select v-model="updateInterval" class="time-select" @change="restartAutoPlay">
-            <option :value="5000">5秒</option>
-            <option :value="10000">10秒</option>
-            <option :value="60000">1分钟</option>
-          </select>
-        </div>
+        <select v-model="selectedMinute" class="btn btn-outline" style="padding: 9px 14px;" @change="updateAll">
+          <option v-for="(t, idx) in timeOptions" :key="idx" :value="idx">{{ t }}</option>
+        </select>
+        <select v-model="updateInterval" class="btn btn-outline" style="padding: 9px 14px;" @change="restartAutoPlay">
+          <option :value="5000">5秒</option>
+          <option :value="10000">10秒</option>
+          <option :value="60000">1分钟</option>
+        </select>
         <button class="btn btn-outline" @click="toggleAutoPlay">
-          {{ isPlaying ? '⏸️' : '▶️' }}
+          {{ isPlaying ? '⏸️ 暂停' : '▶️ 播放' }}
         </button>
-        <button class="btn btn-outline" @click="refreshData">↻</button>
+        <button class="btn btn-outline" @click="refreshData">↻ 刷新</button>
       </div>
     </div>
 
@@ -119,9 +115,12 @@
             {{ isPlaying ? '⏸️' : '▶️' }}
           </button>
           <div class="timeline-slider">
-            <input type="range" v-model.number="selectedMinute" :max="timeOptions.length - 1" min="0" step="1" @input="updateAll">
+            <input type="range" v-model.number="selectedMinute" :max="timeOptions.length - 1" min="0" step="1" @input="updateAll" :disabled="carouselMode === 'idc'">
           </div>
-          <span class="timeline-time">{{ currentTimeDisplay }}</span>
+          <select v-model="carouselMode" class="time-select" style="margin-left:8px;">
+            <option value="idc">按机房</option>
+            <option value="time">按时间</option>
+          </select>
         </div>
       </div>
       <div class="side-card">
@@ -271,6 +270,14 @@ let autoPlayInterval = null
 const isPlaying = ref(true)
 const currentMetric = ref('avg')
 const updateInterval = ref(5000)
+const carouselMode = ref('idc') // 轮播模式：idc-按机房, time-按时间
+const lastUpdate = ref('--')
+
+// 格式化时间
+function fmtTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+}
 
 // 全局指标
 const allMetrics = [
@@ -757,6 +764,7 @@ function switchMetric(metric) {
 }
 
 function updateAll() {
+  lastUpdate.value = fmtTime()
   updateHeatmap()
   updateTopology()
   generateTopLatencyLinks()
@@ -772,13 +780,19 @@ function toggleAutoPlay() {
 function startAutoPlay() {
   clearInterval(autoPlayInterval)
   autoPlayInterval = setInterval(() => {
-    selectedMinute.value = (selectedMinute.value + 1) % timeOptions.value.length
+    if (carouselMode.value === 'time') {
+      // 按时间轮播
+      selectedMinute.value = (selectedMinute.value + 1) % timeOptions.value.length
+    } else {
+      // 按机房轮播，固定最新时间
+      selectedMinute.value = 0
+      // 轮播节点筛选状态
+      const filters = ['all', 'normal', 'high', 'error']
+      const currentIdx = filters.indexOf(nodeFilter.value)
+      nodeFilter.value = filters[(currentIdx + 1) % filters.length]
+    }
     updateAll()
     generateTimeOptions()
-    // 轮播节点筛选状态
-    const filters = ['all', 'normal', 'high', 'error']
-    const currentIdx = filters.indexOf(nodeFilter.value)
-    nodeFilter.value = filters[(currentIdx + 1) % filters.length]
   }, updateInterval.value)
 }
 
