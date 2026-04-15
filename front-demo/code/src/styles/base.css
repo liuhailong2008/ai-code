@@ -208,7 +208,7 @@ input {
   border-radius: var(--radius-sm);
   padding: 8px 14px;
   width: 220px;
-  background: var(--bg-card);
+  background: transparent;
   border: 1px solid var(--border-color);
 }
 
