@@ -1,28 +1,30 @@
 <template>
   <div>
-    <div class="page-header animate-in">
+    <div class="page-header">
       <div>
         <div class="page-title">机房网络监控</div>
         <div class="page-subtitle">监控机房内 Leaf 节点间连通性</div>
       </div>
-      <div class="page-actions">
-        <div class="time-control">
-          <span style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">最后更新:</span>
-          <select v-model="selectedMinute" class="time-select" @change="updateAll">
-            <option v-for="(t, idx) in timeOptions" :key="idx" :value="idx">{{ t }}</option>
-          </select>
-        </div>
-        <div class="update-frequency">
-          <select v-model="updateInterval" class="time-select" @change="restartAutoPlay">
-            <option :value="5000">5秒</option>
-            <option :value="10000">10秒</option>
-            <option :value="60000">1分钟</option>
-          </select>
-        </div>
+<div class="page-actions">
+        <select v-model="currentMetric" class="metric-select" @change="switchMetric(currentMetric)">
+          <option v-for="m in metrics" :key="m.id" :value="m.id">{{ m.label }}</option>
+        </select>
+        <select v-model="carouselMode" class="btn btn-outline" style="padding: 9px 14px;" @change="restartAutoPlay">
+          <option value="idc">按机房</option>
+          <option value="time">按时间</option>
+        </select>
+        <select v-model="selectedMinute" class="btn btn-outline" style="padding: 9px 14px;" @change="updateAll">
+          <option v-for="(t, idx) in timeOptions" :key="idx" :value="idx">{{ t }}</option>
+        </select>
+        <select v-model="updateInterval" class="btn btn-outline" style="padding: 9px 14px;" @change="restartAutoPlay">
+          <option :value="5000">5秒</option>
+          <option :value="10000">10秒</option>
+          <option :value="60000">1分钟</option>
+        </select>
         <button class="btn btn-outline" @click="toggleAutoPlay">
-          {{ isPlaying ? '⏸️ 暂停' : '▶️ 轮播' }}
+          {{ isPlaying ? '⏸️ 暂停' : '▶️ 播放' }}
         </button>
-        <button class="btn btn-outline" @click="refreshData">↻ 刷新数据</button>
+        <button class="btn btn-outline" @click="refreshData">↻ 刷新</button>
       </div>
     </div>
 
@@ -42,17 +44,6 @@
       <div class="heatmap-card">
         <div class="card-header">
           <span class="card-title">{{ selectedIDC }} - Leaf 连通性热力图</span>
-          <div class="card-actions">
-            <button
-              v-for="m in metrics"
-              :key="m.id"
-              class="card-tab"
-              :class="{ active: currentMetric === m.id }"
-              @click="switchMetric(m.id)"
-            >
-              {{ m.label }}
-            </button>
-          </div>
         </div>
         <div class="card-body">
           <div ref="heatmapRef" class="chart-container" style="height: 450px;"></div>
@@ -78,15 +69,21 @@
             <div class="leaf-stats">
               <div class="stat-row">
                 <span class="stat-label">平均</span>
-                <span class="stat-value" :style="{ color: getLatencyColor(link.avg) }">{{ link.avg.toFixed(1) }}ms</span>
+                <span class="stat-value" :style="{ color: getTopLatencyColor(link.avg) }">{{ link.avg.toFixed(1) }}ms</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">P999</span>
-                <span class="stat-value">{{ link.p99.toFixed(1) }}ms</span>
+                <span class="stat-value" :style="{ color: getTopLatencyColor(link.p99) }">
+                  {{ link.p99.toFixed(1) }}ms
+                  <span v-if="link.p99 > 200" class="warning-icon">⚠️</span>
+                </span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">最大</span>
-                <span class="stat-value" style="color: #ef4444;">{{ link.max.toFixed(1) }}ms</span>
+                <span class="stat-value" :style="{ color: getTopLatencyColor(link.max) }">
+                  {{ link.max.toFixed(1) }}ms
+                  <span v-if="link.max > 200" class="warning-icon">⚠️</span>
+                </span>
               </div>
             </div>
           </div>
@@ -107,10 +104,18 @@ let autoPlayInterval = null
 const isPlaying = ref(true)
 const currentMetric = ref('avg')
 const updateInterval = ref(5000)
+const carouselMode = ref('idc') // 轮播模式：idc-按机房, time-按时间
+const lastUpdate = ref('--')
+
+// 格式化时间
+function fmtTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+}
 
 const metrics = [
   { id: 'avg', label: '平均' },
-  { id: 'p99', label: 'P99' },
+  { id: 'p99', label: 'P999' },
   { id: 'max', label: '最大' }
 ]
 
@@ -143,6 +148,12 @@ function getLatencyColor(latency) {
   return '#f97316'
 }
 
+function getTopLatencyColor(latency) {
+  if (latency > 200) return '#ef4444'    // 红色
+  if (latency >= 50) return '#3b82f6'    // 蓝色
+  return '#10b981'                        // 绿色
+}
+
 function rand(min, max) {
   return Math.random() * (max - min) + min
 }
@@ -155,11 +166,38 @@ function generateLeafData() {
       data.push([j, i, parseFloat(latency.toFixed(2))])
     }
   }
+  
+  // 随机选择2条记录，P999设置为50-60
+  const p99Indices = []
+  while (p99Indices.length < 2) {
+    const idx = Math.floor(Math.random() * data.length)
+    const val = data[idx][2]
+    // 排除对角线（自身）和已选中的
+    if (val !== 0 && !p99Indices.includes(idx)) {
+      p99Indices.push(idx)
+      data[idx][2] = rand(50, 60)
+    }
+  }
+  
+  // 随机选择2条记录，最大值设置为200-210
+  const maxIndices = []
+  while (maxIndices.length < 2) {
+    const idx = Math.floor(Math.random() * data.length)
+    const val = data[idx][2]
+    // 排除对角线（自身）和已选中的
+    if (val !== 0 && !maxIndices.includes(idx) && !p99Indices.includes(idx)) {
+      maxIndices.push(idx)
+      data[idx][2] = rand(200, 210)
+    }
+  }
+  
   return data
 }
 
 function generateTopLatencyLinks() {
   const links = []
+  const totalPairs = (leafs.length * (leafs.length - 1)) / 2
+  
   for (let i = 0; i < leafs.length; i++) {
     for (let j = i + 1; j < leafs.length; j++) {
       const avg = rand(0.1, 8.5)
@@ -172,6 +210,27 @@ function generateTopLatencyLinks() {
       })
     }
   }
+  
+  // 随机选择2条记录，P999设置为50-60
+  const p99Indices = []
+  while (p99Indices.length < 2) {
+    const idx = Math.floor(Math.random() * links.length)
+    if (!p99Indices.includes(idx)) {
+      p99Indices.push(idx)
+      links[idx].p99 = rand(50, 60)
+    }
+  }
+  
+  // 随机选择2条记录，最大值设置为200-210
+  const maxIndices = []
+  while (maxIndices.length < 2) {
+    const idx = Math.floor(Math.random() * links.length)
+    if (!maxIndices.includes(idx)) {
+      maxIndices.push(idx)
+      links[idx].max = rand(200, 210)
+    }
+  }
+  
   links.sort((a, b) => b.max - a.max)
   topLatencyLinks.value = links.slice(0, 8)
 }
@@ -210,7 +269,7 @@ function updateHeatmap() {
     grid: {
       top: 40,
       left: 80,
-      right: 20,
+      right: 60,
       bottom: 20
     },
     xAxis: {
@@ -231,9 +290,9 @@ function updateHeatmap() {
       min: 0,
       max: 300,
       calculable: true,
-      orient: 'horizontal',
-      left: 'center',
-      bottom: -10,
+      orient: 'vertical',
+      right: 10,
+      top: 'center',
       inRange: {
         color: ['#065f46', '#059669', '#10b981', '#34d399', '#6ee7b7', '#3b82f6', '#8b5cf6', '#f97316', '#ea580c', '#dc2626']
       },
@@ -253,6 +312,7 @@ function updateHeatmap() {
 }
 
 function updateAll() {
+  lastUpdate.value = fmtTime()
   updateHeatmap()
   generateTopLatencyLinks()
 }
@@ -274,7 +334,20 @@ function toggleAutoPlay() {
 function startAutoPlay() {
   clearInterval(autoPlayInterval)
   autoPlayInterval = setInterval(() => {
-    selectedMinute.value = (selectedMinute.value + 1) % timeOptions.value.length
+    // 按机房轮播时，每分钟更新一次时间选项
+    if (carouselMode.value === 'idc') {
+      generateTimeOptions()
+      selectedMinute.value = 0 // 始终选择最新时间
+    }
+    
+    if (carouselMode.value === 'time') {
+      // 按时间轮播：只更新时间，机房固定
+      selectedMinute.value = (selectedMinute.value + 1) % timeOptions.value.length
+    } else {
+      // 按机房轮播：只轮播机房
+      const currentIdx = idcs.indexOf(selectedIDC.value)
+      selectedIDC.value = idcs[(currentIdx + 1) % idcs.length]
+    }
     updateAll()
     generateTimeOptions()
   }, updateInterval.value)
@@ -318,6 +391,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.page-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); }
+.page-title { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+.page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.page-actions { display: flex; align-items: center; gap: 12px; }
+.metric-select { background: transparent; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+
+.time-control { display: flex; align-items: center; }
+.update-frequency { display: flex; align-items: center; }
+.time-select { background: transparent; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; color: var(--text-primary); cursor: pointer; }
+
 .idc-selector {
   display: flex;
   gap: 8px;
@@ -410,27 +493,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.time-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.update-frequency {
-  display: flex;
-  align-items: center;
-}
-
-.time-select {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
 .timeline-control {
   display: flex;
   align-items: center;
@@ -490,5 +552,10 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--text-primary);
   min-width: 50px;
+}
+
+.warning-icon {
+  margin-left: 4px;
+  font-size: 12px;
 }
 </style>
