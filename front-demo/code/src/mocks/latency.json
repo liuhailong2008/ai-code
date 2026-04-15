@@ -1,0 +1,33 @@
+{
+  "idc": "IDC1-北京",
+  "leafs": [
+    "Leaf-01", "Leaf-02", "Leaf-03", "Leaf-04", "Leaf-05",
+    "Leaf-06", "Leaf-07", "Leaf-08", "Leaf-09", "Leaf-10",
+    "Leaf-11", "Leaf-12", "Leaf-13", "Leaf-14", "Leaf-15"
+  ],
+  "timestamp": "2024-04-14T10:30:00Z",
+  "dataPoints": [
+    { "leaf": "Leaf-01", "latency": 0.82, "loss": 0.001, "status": "normal" },
+    { "leaf": "Leaf-02", "latency": 1.25, "loss": 0.002, "status": "normal" },
+    { "leaf": "Leaf-03", "latency": 0.95, "loss": 0.0005, "status": "normal" },
+    { "leaf": "Leaf-04", "latency": 2.85, "loss": 0.015, "status": "warning" },
+    { "leaf": "Leaf-05", "latency": 1.42, "loss": 0.003, "status": "normal" },
+    { "leaf": "Leaf-06", "latency": 0.68, "loss": 0.001, "status": "normal" },
+    { "leaf": "Leaf-07", "latency": 5.25, "loss": 0.085, "status": "critical" },
+    { "leaf": "Leaf-08", "latency": 1.18, "loss": 0.002, "status": "normal" },
+    { "leaf": "Leaf-09", "latency": 3.42, "loss": 0.028, "status": "warning" },
+    { "leaf": "Leaf-10", "latency": 0.92, "loss": 0.001, "status": "normal" },
+    { "leaf": "Leaf-11", "latency": 1.65, "loss": 0.005, "status": "normal" },
+    { "leaf": "Leaf-12", "latency": 8.95, "loss": 0.152, "status": "critical" },
+    { "leaf": "Leaf-13", "latency": 1.05, "loss": 0.001, "status": "normal" },
+    { "leaf": "Leaf-14", "latency": 2.15, "loss": 0.012, "status": "warning" },
+    { "leaf": "Leaf-15", "latency": 0.78, "loss": 0.001, "status": "normal" }
+  ],
+  "historical": {
+    "times": ["09:00", "09:15", "09:30", "09:45", "10:00", "10:15", "10:30"],
+    "avgLatency": [0.95, 1.02, 0.88, 1.15, 1.08, 0.92, 1.18],
+    "p99Latency": [2.85, 3.12, 2.65, 3.45, 3.28, 2.78, 3.52],
+    "maxLatency": [5.25, 6.85, 4.92, 8.25, 7.15, 5.85, 8.95],
+    "avgLoss": [0.015, 0.018, 0.012, 0.025, 0.022, 0.015, 0.028]
+  }
+}
