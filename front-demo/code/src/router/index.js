@@ -17,7 +17,7 @@ const routes = [
     path: '/latency',
     name: 'LatencyMonitor',
     component: () => import('../views/LatencyMonitor.vue'),
-    meta: { title: '耗时监控' }
+    meta: { title: '机房耗时监控' }
   },
   {
     path: '/alerts/active',

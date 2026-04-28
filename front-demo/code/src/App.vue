@@ -17,7 +17,7 @@
           <span class="nav-icon">🌐</span> 机房网络监控
         </router-link>
         <router-link to="/latency" class="nav-item" :class="{ active: $route.path === '/latency' }">
-          <span class="nav-icon">⏱️</span> 耗时监控
+          <span class="nav-icon">⏱️</span> 机房耗时监控
         </router-link>
 
         <div class="nav-section-title">告警管理</div>
