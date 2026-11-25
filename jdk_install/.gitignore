@@ -1,0 +1,2 @@
+# 原始整包不入库（超过 git / go get 的单文件 100MB 限制），改由 parts/ 分片提供
+bisheng-jdk-*.tar.gz
